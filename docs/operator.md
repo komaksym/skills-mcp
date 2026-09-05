@@ -41,12 +41,6 @@ tunnel-client init \
   --tunnel-id '<second-tunnel-id>' \
   --mcp-server-url http://127.0.0.1:2092/mcp \
   --control-plane-api-key-ref env:CONTROL_PLANE_API_KEY_2
-
-tunnel-client init \
-  --profile chatgpt-chat-skills-mcp-3 \
-  --tunnel-id '<agent-tunnel-id>' \
-  --mcp-server-url http://127.0.0.1:2092/mcp \
-  --control-plane-api-key-ref env:CONTROL_PLANE_API_KEY_AGENT
 ```
 
 Do not commit the real tunnel identifier or any credential value. If the installed tunnel client exposes different flags, follow that installed version's help. See `docs/SECURE_MCP_TUNNEL.md` for the direct service/tunnel smoke procedure.
@@ -55,7 +49,7 @@ Do not commit the real tunnel identifier or any credential value. If the install
 
 Install `mcps-launcher` from its repository with `./install.sh`; its installer is idempotent, backs up conflicting files, and does not edit shell or tunnel configuration.
 
-`mcps-launcher` manages the loopback server and the three account-bound Skills
+`mcps-launcher` manages the loopback server and the two account-bound Skills
 tunnels as one operator target. The Skills commands are:
 
 ```sh
@@ -69,20 +63,19 @@ mcps restart skills
 mcps restart all
 mcps logs skills
 mcps stop skills2
-mcps restart skills3
 mcps logs skills2
 ```
 
 `mcps both`, `mcps stop both`, and `mcps restart both` remain backward-compatible Chrome + Playwright commands and deliberately do not add Skills.
 
-A healthy `mcps status` reports one shared server and three independently
+A healthy `mcps status` reports one shared server and two independently
 matched tunnel PIDs. A missing or stale tunnel is reported on its own route;
 the shared server remains available for the other clients. If the server is
 unavailable, its dependent tunnel processes are cleaned up. `mcps logs skills`
-shows the shared server and all three tunnel logs without printing profile
+shows the shared server and both tunnel logs without printing profile
 contents or credentials.
 
-The three tunnel clients do not imply three Skills catalogs. They are separate
+The two tunnel clients do not imply two Skills catalogs. They are separate
 authenticated outbound identities pointing at one local service. Use separate
 service processes only for divergent catalogs or intentionally separate failure
 domains.

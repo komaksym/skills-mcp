@@ -54,7 +54,8 @@ describe("issue 15 release documentation", () => {
     const tunnel = await read("docs/SECURE_MCP_TUNNEL.md");
     expect(tunnel).toContain("chatgpt-chat-skills-mcp");
     expect(tunnel).toContain("chatgpt-chat-skills-mcp-2");
-    expect(tunnel).toContain("chatgpt-chat-skills-mcp-3");
+    expect(tunnel).not.toContain("chatgpt-chat-skills-mcp-3");
+    expect(tunnel).not.toContain("CONTROL_PLANE_API_KEY_AGENT");
     expect(tunnel).toContain("stateless loopback service");
     expect(tunnel).toContain("mcp-skills");
     expect(tunnel).toContain("mcps status");

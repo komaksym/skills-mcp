@@ -29,7 +29,7 @@ process that already owns the configured port.
 ## Configure the machine-local tunnel profile
 
 The current launcher convention uses one machine-local profile per ChatGPT
-account or logical session. All three clients can safely target the same
+account. Both clients can safely target the same
 stateless loopback service:
 
 ```sh
@@ -44,12 +44,6 @@ tunnel-client init \
   --tunnel-id '<second-tunnel-id>' \
   --mcp-server-url http://127.0.0.1:2092/mcp \
   --control-plane-api-key-ref env:CONTROL_PLANE_API_KEY_2
-
-tunnel-client init \
-  --profile chatgpt-chat-skills-mcp-3 \
-  --tunnel-id '<agent-tunnel-id>' \
-  --mcp-server-url http://127.0.0.1:2092/mcp \
-  --control-plane-api-key-ref env:CONTROL_PLANE_API_KEY_AGENT
 ```
 
 Keep tunnel configuration and credentials outside the repository. If the installed
@@ -68,7 +62,7 @@ mcps stop skills
 ```
 
 `mcp-skills` starts the built loopback server, waits for the exact health response,
-then starts all three dedicated tunnels. `mcps status` reports the shared server
+then starts both dedicated tunnels. `mcps status` reports the shared server
 and each tunnel route separately, and the launcher does not print profile contents
 or credential values.
 
@@ -82,7 +76,7 @@ A healthy local process is necessary but does not prove that ChatGPT reached it.
 When Developer Mode and Secure MCP Tunnel are available:
 
 1. Run `mcp-skills` and observe `mcps status` reporting the shared Skills server
-   and three tunnel routes as running.
+   and both tunnel routes as running.
 2. Observe `/healthz` succeeding on the configured loopback port.
 3. In each ChatGPT Developer Mode account/session, create or select the app
    backed by its corresponding Skills tunnel profile.
@@ -101,7 +95,7 @@ Mode capability was unavailable.
 
 Use `mcps status` first, then `mcps logs skills` for the managed server and all
 tunnel logs. Use `mcps restart skills` to replace the complete Skills lifecycle,
-`mcps restart skills2`/`skills3` to replace one account route, or `mcps stop
+`mcps restart skills2` to replace one account route, or `mcps stop
 skills` to stop the complete shared lifecycle.
 
 If the service reports `EADDRINUSE`, stop the process using the configured port or
