@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import console from "node:console";
 import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
-import { readdir, readFile, readlink } from "node:fs/promises";
+import { lstat, readdir, readFile, readlink } from "node:fs/promises";
 import process from "node:process";
 
 import { pinnedSourceProvenance } from "../src/provenance-state.mjs";
@@ -234,6 +234,17 @@ async function baselineInvariantErrors(root, baselineRoot) {
     .filter((item) => item.isDirectory())
     .sort((left, right) => left.name.localeCompare(right.name))) {
     const baseline = await bundleSnapshot(baselineRoot, entry.name);
+    let currentEntry;
+    try {
+      currentEntry = await lstat(join(root, entry.name));
+    } catch {
+      errors.push("existing baseline bundle removed: " + entry.name);
+      continue;
+    }
+    if (!currentEntry.isDirectory()) {
+      errors.push("existing baseline bundle changed: " + entry.name);
+      continue;
+    }
     const current = await bundleSnapshot(root, entry.name);
     if (!current) {
       errors.push("existing baseline bundle removed: " + entry.name);
