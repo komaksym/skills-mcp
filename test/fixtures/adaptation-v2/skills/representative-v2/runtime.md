@@ -19,7 +19,7 @@ Use `assets/report.key` as the export template. Keep it versioned beside this sk
 
 The target has no assumed native macOS application control and no Equivalent Mechanism for this notification, so select the upstream-supported fallback and stop only the notification operation.
 
-Follow `helper.md` to normalize labels before scoring.
+Use the inlined Deterministic Helper below to normalize labels before scoring.
 
 Prefer the first acceptable label even when a later label would read better.
 
