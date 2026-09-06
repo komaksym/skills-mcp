@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import console from "node:console";
 import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, readlink } from "node:fs/promises";
 import process from "node:process";
 
 import { pinnedSourceProvenance } from "../src/provenance-state.mjs";
@@ -210,7 +210,9 @@ async function bundleSnapshot(root, name) {
       if (entry.isDirectory()) {
         await visit(path, relative);
       } else if (entry.isFile()) {
-        files.set(relative, sha256(await readFile(path)));
+        files.set(relative, "file:" + sha256(await readFile(path)));
+      } else if (entry.isSymbolicLink()) {
+        files.set(relative, "symlink:" + sha256(await readlink(path)));
       }
     }
     return true;
