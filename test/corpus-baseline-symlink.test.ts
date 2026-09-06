@@ -31,11 +31,10 @@ describe("PR-base corpus tree invariant", () => {
     return { baseline, current };
   }
 
-  async function expectChanged(
+  async function runAudit(
     baseline: string,
     current: string,
-    relativePath: string,
-  ): Promise<void> {
+  ): Promise<{ code: number; stderr: string }> {
     let code = 0;
     let stderr = "";
     try {
@@ -48,7 +47,15 @@ describe("PR-base corpus tree invariant", () => {
       code = failed.code ?? 1;
       stderr = failed.stderr ?? "";
     }
+    return { code, stderr };
+  }
 
+  async function expectChanged(
+    baseline: string,
+    current: string,
+    relativePath: string,
+  ): Promise<void> {
+    const { code, stderr } = await runAudit(baseline, current);
     expect(code).toBe(1);
     expect(stderr).toContain("existing baseline bundle changed: " + BUNDLE + "/" + relativePath);
   }
@@ -81,5 +88,15 @@ describe("PR-base corpus tree invariant", () => {
     await symlink("runtime.md", join(current, BUNDLE, "tracked-entry.md"));
 
     await expectChanged(baseline, current, "tracked-entry.md");
+  });
+
+  it("rejects top-level bundle directory to symbolic-link substitution", async () => {
+    const { baseline, current } = await copiedCorpusPair();
+    await rm(join(current, BUNDLE), { recursive: true });
+    await symlink(join(baseline, BUNDLE), join(current, BUNDLE), "dir");
+
+    const { code, stderr } = await runAudit(baseline, current);
+    expect(code).toBe(1);
+    expect(stderr).toContain("existing baseline bundle changed: " + BUNDLE);
   });
 });
