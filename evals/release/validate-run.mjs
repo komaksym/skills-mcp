@@ -237,7 +237,13 @@ function variant(value, definition, expectedSkill, releaseSha, label) {
 
 async function main() {
   const runPath = process.argv[2];
-  if (!runPath) fail("Usage: node evals/release/validate-run.mjs <completed-run.json>");
+  const expectedReleaseSha = process.argv[3];
+  if (!runPath || !expectedReleaseSha) {
+    fail("Usage: node evals/release/validate-run.mjs <completed-run.json> <evaluated-release-sha>");
+  }
+  if (!COMMIT.test(text(expectedReleaseSha, "evaluated release SHA"))) {
+    fail("evaluated release SHA must be a 40-character commit SHA.");
+  }
 
   const suite = JSON.parse(await readFile(CASES_URL, "utf8"));
   const byId = definitions(suite);
@@ -247,6 +253,9 @@ async function main() {
   text(run.runId, "run.runId");
   if (!COMMIT.test(text(run.releaseSha, "run.releaseSha"))) {
     fail("run.releaseSha must be a 40-character commit SHA.");
+  }
+  if (run.releaseSha !== expectedReleaseSha) {
+    fail("run.releaseSha must match the intended evaluated release revision.");
   }
   if (!Array.isArray(run.cases) || run.cases.length !== byId.size) {
     fail("run.cases must contain exactly one result for every defined case.");
