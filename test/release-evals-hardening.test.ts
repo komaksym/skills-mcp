@@ -38,7 +38,7 @@ describe("release evaluation hardening", () => {
     );
   });
 
-  it("pins repository context by case type without exposing a successful adapter oracle", async () => {
+  it("pins adapter cases to an oracle-free source tree", async () => {
     const data = await loadReleaseSuite();
 
     for (const item of data.cases) {
@@ -50,20 +50,19 @@ describe("release evaluation hardening", () => {
       }
     }
 
-    const missing = data.cases.find(
-      (item) => item.id === "adapt-codex-skill-missing-supporting-document",
-    );
-    expect(missing?.repositoryContext).toMatchObject({
-      sourceRepository: ADAPTER_REPOSITORY,
-      baseSha: ADAPTER_PIN,
-    });
+    for (const item of data.cases.filter((candidate) => candidate.workflow === "adapt-codex-skill")) {
+      expect(item.repositoryContext).toMatchObject({
+        sourceRepository: ADAPTER_REPOSITORY,
+        baseSha: ADAPTER_PIN,
+      });
+      expect(item.rubric.every((criterion) => criterion.source.adapter?.commit === ADAPTER_PIN)).toBe(true);
+    }
 
     const success = data.cases.find(
       (item) => item.id === "adapt-codex-skill-representative-success",
     );
-    expect(success?.repositoryContext.sourceRepository).toBe(ADAPTER_REPOSITORY);
-    expect(success?.repositoryContext.baseSha).not.toBe(ADAPTER_PIN);
     expect(success?.prompt).toContain("No expected-output Adaptation Spec exists");
+    expect(success?.prompt).not.toContain("adaptation-spec.md");
   });
 
   it("requires positive and negative independent-worker observations", async () => {
