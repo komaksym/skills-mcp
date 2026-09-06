@@ -194,7 +194,7 @@ describe("manual faithful-workflow release evaluations", () => {
 
     const rejected = await validateReleaseRun(run);
     expect(rejected.status).toBe(1);
-    expect(rejected.stderr).toContain("external result");
+    expect(rejected.stderr).toContain("externalResults");
   });
 
   it("rejects a variant whose recorded Skills MCP revision differs from the release", async () => {
