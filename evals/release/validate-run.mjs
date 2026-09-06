@@ -193,6 +193,7 @@ async function main() {
   }
 
   const seen = new Set();
+  let gatePassed = true;
   for (const resultValue of run.cases) {
     const result = object(resultValue, "case result");
     const caseId = text(result.caseId, "case result.caseId");
@@ -241,10 +242,18 @@ async function main() {
 
     if (typeof result.pass !== "boolean") fail(caseId + ".pass must be boolean.");
     text(result.rationale, caseId + ".rationale");
-    if (result.pass && !adapted.pass) {
-      fail(caseId + " paired result cannot pass unless the adapted condition passes.");
+    if (result.pass && definition.mode === "paired" && !baseline.pass) {
+      fail(caseId + " paired result cannot pass unless the baseline condition passes.");
     }
+    if (result.pass && !adapted.pass) {
+      fail(caseId + " result cannot pass unless the adapted condition passes.");
+    }
+    if (!result.pass) gatePassed = false;
     text(result.comparison, caseId + ".comparison");
+  }
+
+  if (!gatePassed) {
+    fail("completed release gate cannot pass unless every defined case passes.");
   }
 
   process.stdout.write(
