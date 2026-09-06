@@ -19,7 +19,8 @@ Contract in issue #1. Workflow rubric items in `cases.json` name their pinned up
 commit, upstream `SKILL.md` section, and contract user story. Adapter rubric items may
 instead name the pinned `docs/adapt-codex-skill.md` section they exercise. Do not derive
 judgments from a locally rewritten `runtime.md`, provenance prose, evaluator
-preference, or the pre-authored representative `adaptation-spec.md` fixture.
+preference, or remembered expected output. The successful representative adapter
+source fixture is pinned to a commit where no expected-output Adaptation Spec exists.
 
 This matters especially for allowed adaptations: evaluate the upstream outcome, not
 the local mechanism. For example, architecture reporting is judged by the upstream
@@ -40,37 +41,51 @@ uses the upstream HTML delivery mechanism.
    MCP-loaded skill. Load the exact `docs/adapt-codex-skill.md` commit/path named by the
    rubric source and record evidence that this exact document was the behavioral
    source. The adapter pin is independent of `run.releaseSha`.
-5. Paired baseline: use a fresh conversation and do **not** load the evaluated MCP
+5. If the case defines `targetEnvironmentRepositories`, inspect every listed repository
+   directly before scoring target mappings. Record each observed current 40-character
+   commit and concise read evidence in `targetEnvironment`. Output semantics alone do
+   not establish that the adapter inspected current Skills MCP, `mcps-launcher`, or the
+   relevant MCP implementation.
+6. Paired baseline: use a fresh conversation and do **not** load the evaluated MCP
    workflow. Paired adapted: use another fresh conversation and load only the named
    public workflow. Observation cases use one fresh direct-observation context.
-6. Send the fixed `followUp` only at the scripted boundary. If a variant crosses that
+7. Send the fixed `followUp` only at the scripted boundary. If a variant crosses that
    boundary early, record the relevant rubric failure before continuing.
-7. A failed or unavailable Live Capability never passes because a weaker fallback
+8. A failed or unavailable Live Capability never passes because a weaker fallback
    produced something convenient. Judge against the source-required stop behavior or
    other fallback declared by the pinned behavioral source.
-8. Record relevant model output and any durable external result needed to verify the
-   behavior. Claims about GitHub mutations, tests, commits, PRs, labels, or
-   relationships require observed external evidence. A rubric criterion marked
+9. Record relevant model output and any durable external result needed to verify the
+   behavior. Claims about GitHub mutations, tests, commits, PRs, labels, relationships,
+   or worker execution require observed external evidence. A rubric criterion marked
    `requiresExternalEvidence` cannot pass with an empty `externalResults` record.
 
+For the positive independent-worker observation, external evidence must identify at
+least two distinct isolated child workers and show concurrent/overlapping execution.
+Do not infer parallelism merely because two reviews were eventually returned, and do
+not consume one child result before dispatching the other. The negative companion case
+still proves that unavailable isolation causes strict review to stop rather than
+silently degrading to sequential parent-context passes.
+
 For observation cases, set `baseline` to `null` and use the adapted record to capture
-the direct observation. Do not invent a no-skill comparison for dependency timing,
-unavailable-capability stopping, or adapter behavior when direct observation is the
-meaningful test.
+the direct observation. Do not invent a no-skill comparison for worker capability or
+adapter behavior when direct observation is the meaningful test.
 
 The suite contains one representative normal workflow plus focused observations for
-dependency timing, truthful stopping, adapter missing-required-material behavior, and
-a successful adapter run over a complete representative v2 bundle. The successful
-adapter observation is semantic: judge preservation, runtime mappings, helper and
-Dependency Skill boundaries, truthful provenance, and completion of the Adaptation
-Spec. Do not snapshot exact wording.
+successful independent-worker execution, truthful stopping when isolation is
+unavailable, adapter missing-required-material behavior, and a successful adapter run
+over a complete representative v2 bundle. The successful adapter observation is
+semantic but not output-only: judge preservation, runtime mappings, helper and
+Dependency Skill boundaries, truthful provenance, current target-environment read
+evidence, and completion of the Adaptation Spec. Do not snapshot exact wording.
 
 ## Recording
 
 Copy `run-template.json` to a release record outside routine CI artifacts. For every
 variant record, capture the exact model, repository URL/base, capabilities, relevant
 output and external results, every rubric judgment with evidence, and overall
-pass/fail with a short rationale.
+pass/fail with a short rationale. `targetEnvironment` is an empty array unless the case
+defines required target repositories; when required, it must contain exactly those
+repositories in the fixed order with the observed commit and read evidence.
 
 Evidence-source fields are mutually exclusive:
 
@@ -81,7 +96,7 @@ Evidence-source fields are mutually exclusive:
   repository `komaksym/skills-mcp`, the pinned adapter commit and path, and evidence
   showing that exact document was loaded for the run.
 
-An adapter evidence record has this shape:
+An adapter evidence record with target reads has this shape:
 
 ```json
 {
@@ -91,13 +106,21 @@ An adapter evidence record has this shape:
     "commit": "<pinned adapter commit>",
     "path": "docs/adapt-codex-skill.md",
     "evidence": "<how this exact document was observed as the behavioral source>"
-  }
+  },
+  "targetEnvironment": [
+    {
+      "repository": "<required target repository>",
+      "commit": "<observed current commit>",
+      "evidence": "<what was read to establish the target mapping>"
+    }
+  ]
 }
 ```
 
 Then write the behavioral delta in `comparison` for paired cases. Observation cases
 should state what was directly observed instead. A variant may legitimately fail; the
-record must say why rather than turning `not-observed` into success.
+record must say why rather than turning `not-observed` into success. Such a record is
+useful evidence, but it does not pass the release gate.
 
 Validate the completed record with:
 
@@ -105,5 +128,7 @@ Validate the completed record with:
 node evals/release/validate-run.mjs path/to/completed-run.json
 ```
 
-The validator checks comparability and record completeness only. It does not judge
-model quality and does not execute model calls.
+The validator checks comparability, evidence structure, and release-gate completeness.
+A completed gate is rejected unless every required case passes, including both sides
+of the paired case. It does not independently judge model quality and does not execute
+model calls.
