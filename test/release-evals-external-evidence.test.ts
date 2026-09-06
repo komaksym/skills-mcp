@@ -28,4 +28,21 @@ describe("release evaluation external evidence", () => {
       expect(rejected.stderr).toContain("externalResults");
     }
   });
+
+  it("rejects one generic external result shared across unrelated passing criteria", async () => {
+    const data = await loadReleaseSuite();
+    const run = completedReleaseRun(data) as {
+      cases: Array<{
+        caseId: string;
+        adapted: { externalResults: unknown[] };
+      }>;
+    };
+    const paired = run.cases.find((item) => item.caseId === "representative-to-spec");
+    if (!paired) throw new Error("expected representative paired case");
+    paired.adapted.externalResults = ["One generic external result."];
+
+    const rejected = await validateReleaseRun(run);
+    expect(rejected.status).toBe(1);
+    expect(rejected.stderr).toContain("externalResults");
+  });
 });
