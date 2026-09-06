@@ -64,34 +64,35 @@
       ]
     },
     {
-      "id": "grill-with-docs-dependency-timing",
+      "id": "code-review-independent-workers",
       "mode": "observation",
-      "workflow": "grill-with-docs",
+      "workflow": "code-review",
       "model": "GPT-5.6 Sol",
-      "task": "Observe the dependency composition of a repository-metadata review without turning the session into implementation or specification work.",
+      "task": "Observe strict code review when genuinely independent direct-GitHub review contexts are available.",
       "repositoryContext": {
         "sourceRepository": "komaksym/chatgpt-chat-skills-mcp",
         "baseSha": "de37f7c16bb2ec229f13d3edbde8cdcb3dcfe246",
         "writes": false,
-        "reset": "Use a fresh read-only conversation pinned to this commit."
+        "reset": "Use a fresh read-only conversation pinned to this commit and a fresh independent-worker run."
       },
       "capabilities": [
         "GitHub repository read",
-        "MCP load_skill/list_skills"
+        "MCP load_skill/list_skills",
+        "genuinely independent ChatGPT child conversations with direct GitHub access and concurrent dispatch"
       ],
-      "prompt": "Load `grill-with-docs` and observe which Dependency Skills it requests and when. Do not embed or summarize those dependency runtimes in the parent response.",
+      "prompt": "Review the changes from `5ce66a5b7e2a16344a3a5a0ef9d847adc7fd96d0` to the pinned repository head. Genuinely independent direct-GitHub child conversations are available and can run concurrently; use the strict code-review workflow.",
       "rubric": [
         {
-          "id": "dependency-timing",
+          "id": "independent-workers-parallel",
           "source": {
             "upstream": {
               "commit": "6654f6b60cd9d5be8b54c6fafe44346dabeb3b76",
-              "path": "skills/engineering/grill-with-docs/SKILL.md",
-              "section": "entrypoint instruction"
+              "path": "skills/engineering/code-review/SKILL.md",
+              "section": "Process step 4: parallel sub-agents"
             },
-            "contract": { "issue": 1, "userStory": 20 }
+            "contract": { "issue": 1, "userStory": 11 }
           },
-          "passWhen": "Requests the separate `grilling` and `domain-modeling` Dependency Skills immediately at the parent workflow's composition point rather than embedding or deferring them.",
+          "passWhen": "Observed evidence identifies at least two distinct isolated direct-GitHub child workers, shows they were dispatched without consuming either result first, demonstrates overlapping execution rather than sequential simulation, and shows the parent waited for the independent-review barrier before synthesis.",
           "requiresExternalEvidence": true
         }
       ]
@@ -182,16 +183,34 @@
       "task": "Observe whether the pinned external adapter produces a faithful, implementable Adaptation Spec for a complete representative v2 bundle.",
       "repositoryContext": {
         "sourceRepository": "komaksym/skills-mcp",
-        "baseSha": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+        "baseSha": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
         "writes": false,
-        "reset": "Use a fresh read-only conversation pinned to this commit. Load the exact pinned adapter document, then inspect the complete representative bundle from the pinned repository without using the pre-authored adaptation-spec.md as expected output."
+        "reset": "Use a fresh read-only conversation pinned to this oracle-free fixture commit. Load the adapter separately from docs/adapt-codex-skill.md at its fixed adapter commit, then inspect the complete representative bundle and current target repositories."
       },
+      "targetEnvironmentRepositories": [
+        "komaksym/chatgpt-chat-skills-mcp",
+        "komaksym/mcps-launcher",
+        "komaksym/chrome-browser-mcp"
+      ],
       "capabilities": [
         "GitHub repository read across the source and referenced target repositories",
         "external adapt-codex-skill loaded from docs/adapt-codex-skill.md at the pinned commit"
       ],
-      "prompt": "Run `adapt-codex-skill` on the complete representative bundle at `test/fixtures/adaptation-v2/skills/representative-v2/` in the pinned repository. Treat `source.md` as the bundle entrypoint, `helper.md` as its required Supporting Document, `assets/report.key` as its Repository Asset, and `fixture-dependency` as the separate Dependency Skill referenced by the entrypoint. The fixture intentionally has no canonical upstream GitHub source. Inspect the pinned bundle and the target repositories required by the adapter, then return only the resulting Adaptation Spec. Do not read or use `test/fixtures/adaptation-v2/adaptation-spec.md` as expected output.",
+      "prompt": "Run `adapt-codex-skill` on the complete representative bundle at `test/fixtures/adaptation-v2/skills/representative-v2/` in the pinned source-fixture repository. Treat `source.md` as the bundle entrypoint, `helper.md` as its required Supporting Document, `assets/report.key` as its Repository Asset, and `fixture-dependency` as the separate Dependency Skill referenced by the entrypoint. The fixture intentionally has no canonical upstream GitHub source. Inspect the current target repositories required by the adapter and record the exact current commit observed for each required target repository as evaluation evidence, then return only the resulting Adaptation Spec. No expected-output Adaptation Spec exists in the pinned source fixture.",
       "rubric": [
+        {
+          "id": "inspects-current-target-environment",
+          "source": {
+            "adapter": {
+              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "path": "docs/adapt-codex-skill.md",
+              "section": "Inspect"
+            },
+            "contract": { "issue": 1, "userStory": 11 }
+          },
+          "passWhen": "Records direct inspection evidence and an observed 40-character current commit for Skills MCP, mcps-launcher, and the relevant Chrome Browser MCP repository before scoring target mappings; output-only or remembered target claims do not pass.",
+          "requiresExternalEvidence": true
+        },
         {
           "id": "preserves-unforced-methodology",
           "source": {
