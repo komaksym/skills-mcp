@@ -176,6 +176,7 @@ describe("release evaluation hardening", () => {
           caseId: string;
           adapted: {
             pass: boolean;
+            externalResults: Array<{ criterionId: string; evidence: string }>;
             rubric: Array<{ judgment: "pass" | "fail" | "not-observed" }>;
           };
           pass: boolean;
@@ -186,6 +187,9 @@ describe("release evaluation hardening", () => {
       );
       if (!observation) throw new Error("expected successful adapter observation");
       observation.adapted.rubric[0]!.judgment = judgment;
+      observation.adapted.externalResults = observation.adapted.externalResults.filter(
+        (entry) => entry.criterionId !== "inspects-current-target-environment",
+      );
       observation.adapted.pass = false;
       observation.pass = false;
 
