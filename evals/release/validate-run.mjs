@@ -173,9 +173,6 @@ function variant(value, definition, expectedSkill, releaseSha, label) {
   }
 
   if (!Array.isArray(item.externalResults)) fail(label + ".externalResults must be an array.");
-  for (let index = 0; index < item.externalResults.length; index += 1) {
-    text(item.externalResults[index], label + ".externalResults[" + index + "]");
-  }
   const output = typeof item.output === "string" ? item.output.trim() : "";
   if (output === "" && item.externalResults.length === 0) {
     fail(label + " must record relevant output or an external result.");
@@ -184,7 +181,7 @@ function variant(value, definition, expectedSkill, releaseSha, label) {
   if (!Array.isArray(item.rubric) || item.rubric.length !== definition.rubric.length) {
     fail(label + ".rubric must contain every fixed criterion.");
   }
-  let passedExternalCriterion = null;
+  const passedExternalCriteria = [];
   for (let index = 0; index < definition.rubric.length; index += 1) {
     const expectedCriterion = definition.rubric[index];
     const actual = object(item.rubric[index], label + ".rubric[" + index + "]");
@@ -194,16 +191,40 @@ function variant(value, definition, expectedSkill, releaseSha, label) {
     if (!JUDGMENTS.has(actual.judgment)) fail(label + "." + actual.id + ".judgment is invalid.");
     text(actual.evidence, label + "." + actual.id + ".evidence");
     if (expectedCriterion.requiresExternalEvidence && actual.judgment === "pass") {
-      passedExternalCriterion ??= actual.id;
+      passedExternalCriteria.push(actual.id);
     }
   }
-  if (passedExternalCriterion && item.externalResults.length === 0) {
-    fail(
-      label +
-        " must record an external result when externally observed criterion " +
-        passedExternalCriterion +
-        " passes.",
+
+  const externalByCriterion = new Map();
+  for (let index = 0; index < item.externalResults.length; index += 1) {
+    const external = object(
+      item.externalResults[index],
+      label + ".externalResults[" + index + "]",
     );
+    const criterionId = text(
+      external.criterionId,
+      label + ".externalResults[" + index + "].criterionId",
+    );
+    text(external.evidence, label + ".externalResults[" + index + "].evidence");
+    if (externalByCriterion.has(criterionId)) {
+      fail(label + ".externalResults must bind each criterion at most once.");
+    }
+    externalByCriterion.set(criterionId, external.evidence);
+  }
+
+  if (externalByCriterion.size !== passedExternalCriteria.length) {
+    fail(label + ".externalResults must contain exactly one result for each passing external criterion.");
+  }
+  const passedExternalSet = new Set(passedExternalCriteria);
+  for (const criterionId of passedExternalCriteria) {
+    if (!externalByCriterion.has(criterionId)) {
+      fail(label + ".externalResults is missing evidence for passing criterion " + criterionId + ".");
+    }
+  }
+  for (const criterionId of externalByCriterion.keys()) {
+    if (!passedExternalSet.has(criterionId)) {
+      fail(label + ".externalResults references non-passing external criterion " + criterionId + ".");
+    }
   }
 
   if (typeof item.pass !== "boolean") fail(label + ".pass must be boolean.");
