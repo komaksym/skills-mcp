@@ -6,6 +6,7 @@ const CASES_URL = new URL("./cases.json", import.meta.url);
 const JUDGMENTS = new Set(["pass", "fail", "not-observed"]);
 const SKILLS_MCP_REPOSITORY = "komaksym/chatgpt-chat-skills-mcp";
 const ADAPTER_WORKFLOW = "adapt-codex-skill";
+const COMMIT = /^[a-f0-9]{40}$/;
 
 function fail(message) {
   throw new Error(message);
@@ -66,6 +67,17 @@ function definitions(suite) {
     if (!Array.isArray(definition.capabilities) || definition.capabilities.length === 0) {
       fail(definition.id + ".capabilities must be a non-empty array.");
     }
+    if (
+      definition.targetEnvironmentRepositories !== undefined &&
+      (!Array.isArray(definition.targetEnvironmentRepositories) ||
+        new Set(definition.targetEnvironmentRepositories).size !==
+          definition.targetEnvironmentRepositories.length ||
+        definition.targetEnvironmentRepositories.some(
+          (repository) => typeof repository !== "string" || repository.trim() === "",
+        ))
+    ) {
+      fail(definition.id + ".targetEnvironmentRepositories must be a unique string array.");
+    }
     if (!Array.isArray(definition.rubric) || definition.rubric.length === 0) {
       fail(definition.id + ".rubric must be a non-empty array.");
     }
@@ -118,12 +130,34 @@ function validateEvidenceSource(item, definition, releaseSha, label) {
   text(skillsMcp.evidence, label + ".skillsMcp.evidence");
 }
 
+function validateTargetEnvironment(item, definition, label) {
+  const expected = definition.targetEnvironmentRepositories ?? [];
+  if (!Array.isArray(item.targetEnvironment) || item.targetEnvironment.length !== expected.length) {
+    fail(label + ".targetEnvironment must record every fixed target repository exactly once.");
+  }
+
+  for (let index = 0; index < expected.length; index += 1) {
+    const actual = object(
+      item.targetEnvironment[index],
+      label + ".targetEnvironment[" + index + "]",
+    );
+    if (actual.repository !== expected[index]) {
+      fail(label + ".targetEnvironment repositories/order must match the fixed target inventory.");
+    }
+    if (!COMMIT.test(text(actual.commit, label + ".targetEnvironment[" + index + "].commit"))) {
+      fail(label + ".targetEnvironment commit must be a 40-character commit SHA.");
+    }
+    text(actual.evidence, label + ".targetEnvironment[" + index + "].evidence");
+  }
+}
+
 function variant(value, definition, expectedSkill, releaseSha, label) {
   const item = object(value, label);
   if (item.skill !== expectedSkill) fail(label + ".skill does not match the fixed condition.");
   if (item.model !== definition.model) fail(label + ".model does not match the fixed case model.");
 
   validateEvidenceSource(item, definition, releaseSha, label);
+  validateTargetEnvironment(item, definition, label);
 
   if (!same(item.capabilities, definition.capabilities)) {
     fail(label + ".capabilities must exactly match the fixed case capabilities.");
@@ -149,12 +183,14 @@ function variant(value, definition, expectedSkill, releaseSha, label) {
   }
   let passedExternalCriterion = null;
   for (let index = 0; index < definition.rubric.length; index += 1) {
-    const expected = definition.rubric[index];
+    const expectedCriterion = definition.rubric[index];
     const actual = object(item.rubric[index], label + ".rubric[" + index + "]");
-    if (actual.id !== expected.id) fail(label + ".rubric ids/order must match the fixed rubric.");
+    if (actual.id !== expectedCriterion.id) {
+      fail(label + ".rubric ids/order must match the fixed rubric.");
+    }
     if (!JUDGMENTS.has(actual.judgment)) fail(label + "." + actual.id + ".judgment is invalid.");
     text(actual.evidence, label + "." + actual.id + ".evidence");
-    if (expected.requiresExternalEvidence && actual.judgment === "pass") {
+    if (expectedCriterion.requiresExternalEvidence && actual.judgment === "pass") {
       passedExternalCriterion ??= actual.id;
     }
   }
@@ -185,7 +221,7 @@ async function main() {
 
   if (run.mode !== "manual-release") fail("run.mode must be manual-release.");
   text(run.runId, "run.runId");
-  if (!/^[a-f0-9]{40}$/.test(text(run.releaseSha, "run.releaseSha"))) {
+  if (!COMMIT.test(text(run.releaseSha, "run.releaseSha"))) {
     fail("run.releaseSha must be a 40-character commit SHA.");
   }
   if (!Array.isArray(run.cases) || run.cases.length !== byId.size) {
