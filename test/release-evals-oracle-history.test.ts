@@ -7,18 +7,24 @@ import { describe, expect, it } from "vitest";
 import { ADAPTER_PIN } from "./release-evals-support.js";
 
 const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
-const ANSWER_KEY_PATH = "test/fixtures/adaptation-v2/adaptation-spec.md";
+const ORACLE_PATHS = [
+  "test/fixtures/adaptation-v2/adaptation-spec.md",
+  "test/fixtures/adaptation-v2/skills/representative-v2/runtime.md",
+  "test/fixtures/adaptation-v2/skills/representative-v2/provenance.json",
+];
 
 describe("release adapter oracle isolation", () => {
-  it("pins a fixture whose ancestry never contained the expected Adaptation Spec", () => {
-    const history = spawnSync(
-      "git",
-      ["rev-list", ADAPTER_PIN, "--", ANSWER_KEY_PATH],
-      { cwd: ROOT, encoding: "utf8" },
-    );
+  it("pins a fixture whose ancestry never contained adapted-output answer artifacts", () => {
+    for (const path of ORACLE_PATHS) {
+      const history = spawnSync(
+        "git",
+        ["rev-list", ADAPTER_PIN, "--", path],
+        { cwd: ROOT, encoding: "utf8" },
+      );
 
-    expect(history.status).toBe(0);
-    expect(history.stderr).toBe("");
-    expect(history.stdout.trim()).toBe("");
+      expect(history.status).toBe(0);
+      expect(history.stderr).toBe("");
+      expect(history.stdout.trim(), path).toBe("");
+    }
   });
 });
