@@ -23,6 +23,7 @@
           "sourceRepository": "",
           "baseSha": ""
         },
+        "targetEnvironment": [],
         "capabilities": [],
         "output": "",
         "externalResults": [],
@@ -44,6 +45,7 @@
           "sourceRepository": "",
           "baseSha": ""
         },
+        "targetEnvironment": [],
         "capabilities": [],
         "output": "",
         "externalResults": [],
