@@ -9,7 +9,7 @@ export const UPSTREAM_PIN = "6654f6b60cd9d5be8b54c6fafe44346dabeb3b76";
 export const WORKFLOW_REPOSITORY = "komaksym/chatgpt-chat-skills-mcp";
 export const WORKFLOW_PIN = "de37f7c16bb2ec229f13d3edbde8cdcb3dcfe246";
 export const ADAPTER_REPOSITORY = "komaksym/skills-mcp";
-export const ADAPTER_PIN = "53342ce2d1873eff6a9cd7e7f19388f7fe03572c";
+export const ADAPTER_PIN = "94226fc2a9a37039ba31c7bb58676aca531154eb";
 
 export interface SourceReference {
   commit: string;
