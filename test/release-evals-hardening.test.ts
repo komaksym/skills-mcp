@@ -207,6 +207,72 @@ describe("release evaluation hardening", () => {
     }
   });
 
+  it("rejects a paired case that claims PASS when its baseline failed", async () => {
+    const data = await suite();
+    const directory = await mkdtemp(join(tmpdir(), "release-evals-hardening-"));
+    const runPath = join(directory, "run.json");
+    const validatorPath = fileURLToPath(new URL("validate-run.mjs", ROOT));
+
+    try {
+      const run = completedRun(data) as {
+        cases: Array<{
+          caseId: string;
+          baseline: null | {
+            pass: boolean;
+            rubric: Array<{ judgment: "pass" | "fail" | "not-observed" }>;
+          };
+          pass: boolean;
+        }>;
+      };
+      const paired = run.cases.find((item) => item.caseId === "representative-to-spec");
+      if (!paired?.baseline) throw new Error("expected paired evaluation case");
+      paired.baseline.rubric[0]!.judgment = "fail";
+      paired.baseline.pass = false;
+      paired.pass = true;
+      await writeFile(runPath, JSON.stringify(run), "utf8");
+
+      const rejected = spawnSync(process.execPath, [validatorPath, runPath], { encoding: "utf8" });
+      expect(rejected.status).toBe(1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects completed release gates containing fail or not-observed required cases", async () => {
+    const data = await suite();
+    const validatorPath = fileURLToPath(new URL("validate-run.mjs", ROOT));
+
+    for (const judgment of ["fail", "not-observed"] as const) {
+      const directory = await mkdtemp(join(tmpdir(), "release-evals-hardening-"));
+      const runPath = join(directory, "run.json");
+      try {
+        const run = completedRun(data) as {
+          cases: Array<{
+            caseId: string;
+            adapted: {
+              pass: boolean;
+              rubric: Array<{ judgment: "pass" | "fail" | "not-observed" }>;
+            };
+            pass: boolean;
+          }>;
+        };
+        const observation = run.cases.find(
+          (item) => item.caseId === "adapt-codex-skill-representative-success",
+        );
+        if (!observation) throw new Error("expected successful adapter observation");
+        observation.adapted.rubric[0]!.judgment = judgment;
+        observation.adapted.pass = false;
+        observation.pass = false;
+        await writeFile(runPath, JSON.stringify(run), "utf8");
+
+        const rejected = spawnSync(process.execPath, [validatorPath, runPath], { encoding: "utf8" });
+        expect(rejected.status).toBe(1);
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  });
+
   it("keeps release proof incomplete until the five-case manual record exists", async () => {
     const proof = await readFile(new URL("../docs/release-proof.md", import.meta.url), "utf8");
 
