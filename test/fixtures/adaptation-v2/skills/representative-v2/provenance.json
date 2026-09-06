@@ -133,6 +133,22 @@
       },
       {
         "allowedRuntimeChange": "inline-supporting-document",
+        "source": "source.md",
+        "evidence": {
+          "targetRuntimeProfile": "chatgpt-web-mcp-v2",
+          "constraints": [
+            "only-load-skill-and-list-skills"
+          ],
+          "incompatibility": "The required helper is inlined into the Generated Runtime, so the entrypoint must retarget its Supporting Document reference to the inlined material."
+        },
+        "transform": {
+          "type": "replace-exact",
+          "match": "Follow `helper.md` to normalize labels before scoring.",
+          "replacement": "Use the inlined Deterministic Helper below to normalize labels before scoring."
+        }
+      },
+      {
+        "allowedRuntimeChange": "inline-supporting-document",
         "source": "helper.md",
         "evidence": {
           "targetRuntimeProfile": "chatgpt-web-mcp-v2",
