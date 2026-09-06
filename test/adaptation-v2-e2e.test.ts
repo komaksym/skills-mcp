@@ -100,6 +100,13 @@ describe("v2 adaptation acceptance", () => {
     expect(source).toContain(methodology);
     expect(generated).toContain(methodology);
 
+    const helperReference = "Follow `helper.md` to normalize labels before scoring.";
+    expect(source).toContain(helperReference);
+    expect(generated).not.toContain(helperReference);
+    expect(generated).toContain(
+      "Use the inlined Deterministic Helper below to normalize labels before scoring.",
+    );
+
     const upstreamHelper = extractJavaScript(helper);
     expect(extractJavaScript(generated)).toBe(upstreamHelper);
     expect(executeHelper(upstreamHelper)).toEqual(["alpha", "alpha", "beta"]);
