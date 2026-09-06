@@ -121,7 +121,8 @@ historical three-case record.
 1. Build the exact release revision used by the MCP workflow cases and observe the
    loopback health response.
 2. For MCP workflow cases, record the observed Skills MCP revision and how it was
-   verified.
+   verified. This exact evaluated revision, not an incidental PR head, is the SHA that
+   must be supplied to the validator alongside the completed record.
 3. For the positive code-review case, record distinct worker identities plus evidence
    of overlapping execution and barrier completion before synthesis.
 4. For external adapter cases, load the exact pinned adapter commit/path and record
@@ -131,11 +132,12 @@ historical three-case record.
    target repository and record its observed current commit and read evidence.
 6. Use fresh contexts and the fixed model, prompt, repository context, capabilities,
    and rubric from `evals/release/cases.json`.
-7. Record observed external results whenever a criterion requires them.
+7. Record observed external results whenever a criterion requires them, including the
+   criterion-specific machine-checkable facts documented in `evals/release/README.md`.
 8. Validate the completed record with:
 
 ```sh
-node evals/release/validate-run.mjs path/to/completed-run.json
+node evals/release/validate-run.mjs path/to/completed-run.json <evaluated-release-sha>
 ```
 
 Captured evidence must contain no secrets, tunnel credentials, or machine-local

@@ -30,6 +30,159 @@ function same(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function instant(value, label) {
+  const raw = text(value, label);
+  const timestamp = Date.parse(raw);
+  if (!Number.isFinite(timestamp)) fail(label + " must be a valid timestamp.");
+  return timestamp;
+}
+
+function validateGithubIssueFacts(external, criterionId, label) {
+  const facts = object(external.facts, label + "." + criterionId + ".facts");
+  const issue = object(facts.githubIssue, label + "." + criterionId + ".facts.githubIssue");
+  const rawUrl = text(issue.url, label + "." + criterionId + ".facts.githubIssue.url");
+  let issueUrl;
+  try {
+    issueUrl = new URL(rawUrl);
+  } catch {
+    fail(label + "." + criterionId + ".facts.githubIssue.url must be a GitHub issue URL.");
+  }
+  if (
+    issueUrl.protocol !== "https:" ||
+    issueUrl.hostname !== "github.com" ||
+    !/^\/[^/]+\/[^/]+\/issues\/\d+\/?$/.test(issueUrl.pathname)
+  ) {
+    fail(label + "." + criterionId + ".facts.githubIssue.url must be a GitHub issue URL.");
+  }
+  if (
+    !Array.isArray(issue.labels) ||
+    issue.labels.some((entry) => typeof entry !== "string" || entry.trim() === "")
+  ) {
+    fail(label + "." + criterionId + ".facts.githubIssue.labels must be a string array.");
+  }
+  if (criterionId === "ready-for-agent" && !issue.labels.includes("ready-for-agent")) {
+    fail(label + ".ready-for-agent facts must record the ready-for-agent label.");
+  }
+}
+
+function validateIndependentWorkerFacts(external, label) {
+  const criterionId = "independent-workers-parallel";
+  const facts = object(external.facts, label + "." + criterionId + ".facts");
+  if (!Array.isArray(facts.workers) || facts.workers.length < 2) {
+    fail(label + "." + criterionId + " facts must record at least two workers.");
+  }
+
+  const workerIds = new Set();
+  const intervals = [];
+  for (let index = 0; index < facts.workers.length; index += 1) {
+    const worker = object(facts.workers[index], label + "." + criterionId + ".workers[" + index + "]");
+    const id = text(worker.id, label + "." + criterionId + ".workers[" + index + "].id");
+    if (workerIds.has(id)) {
+      fail(label + "." + criterionId + " facts must identify distinct workers.");
+    }
+    workerIds.add(id);
+    if (worker.isolated !== true || worker.directGithub !== true) {
+      fail(label + "." + criterionId + " workers must be isolated and use direct GitHub access.");
+    }
+    const dispatchedAt = instant(
+      worker.dispatchedAt,
+      label + "." + criterionId + ".workers[" + index + "].dispatchedAt",
+    );
+    const startedAt = instant(
+      worker.startedAt,
+      label + "." + criterionId + ".workers[" + index + "].startedAt",
+    );
+    const completedAt = instant(
+      worker.completedAt,
+      label + "." + criterionId + ".workers[" + index + "].completedAt",
+    );
+    if (dispatchedAt > startedAt || startedAt >= completedAt) {
+      fail(label + "." + criterionId + " worker timing must be dispatch <= start < completion.");
+    }
+    intervals.push({ dispatchedAt, startedAt, completedAt });
+  }
+
+  let overlaps = false;
+  for (let left = 0; left < intervals.length; left += 1) {
+    for (let right = left + 1; right < intervals.length; right += 1) {
+      if (
+        Math.max(intervals[left].startedAt, intervals[right].startedAt) <
+        Math.min(intervals[left].completedAt, intervals[right].completedAt)
+      ) {
+        overlaps = true;
+      }
+    }
+  }
+  if (!overlaps) {
+    fail(label + "." + criterionId + " facts must demonstrate overlapping worker execution.");
+  }
+
+  if (facts.barrierSatisfied !== true) {
+    fail(label + "." + criterionId + " facts must record a satisfied parent barrier.");
+  }
+  const barrierCompletedAt = instant(
+    facts.barrierCompletedAt,
+    label + "." + criterionId + ".barrierCompletedAt",
+  );
+  const firstResultConsumedAt = instant(
+    facts.firstResultConsumedAt,
+    label + "." + criterionId + ".firstResultConsumedAt",
+  );
+  const synthesisStartedAt = instant(
+    facts.synthesisStartedAt,
+    label + "." + criterionId + ".synthesisStartedAt",
+  );
+  const latestCompletion = Math.max(...intervals.map((entry) => entry.completedAt));
+  if (barrierCompletedAt < latestCompletion) {
+    fail(label + "." + criterionId + " barrier cannot complete before all workers complete.");
+  }
+  if (firstResultConsumedAt < barrierCompletedAt) {
+    fail(label + "." + criterionId + " results cannot be consumed before the parent barrier.");
+  }
+  if (synthesisStartedAt < barrierCompletedAt) {
+    fail(label + "." + criterionId + " synthesis cannot start before the parent barrier.");
+  }
+}
+
+function validateStopWithoutIsolationFacts(external, label) {
+  const criterionId = "stop-instead-degrade";
+  const facts = object(external.facts, label + "." + criterionId + ".facts");
+  if (
+    facts.isolationAvailable !== false ||
+    facts.strictReviewStopped !== true ||
+    facts.sequentialFallbackUsed !== false
+  ) {
+    fail(
+      label +
+        "." +
+        criterionId +
+        " facts must record unavailable isolation, strict stopping, and no sequential fallback.",
+    );
+  }
+}
+
+function validateExternalFacts(external, criterionId, definition, label) {
+  if (criterionId === "ready-for-agent" || criterionId === "observed-publication") {
+    validateGithubIssueFacts(external, criterionId, label);
+    return;
+  }
+  if (criterionId === "independent-workers-parallel") {
+    validateIndependentWorkerFacts(external, label);
+    return;
+  }
+  if (criterionId === "stop-instead-degrade") {
+    validateStopWithoutIsolationFacts(external, label);
+    return;
+  }
+  if (criterionId === "inspects-current-target-environment") {
+    if ((definition.targetEnvironmentRepositories ?? []).length === 0) {
+      fail(label + "." + criterionId + " requires fixed target-environment repositories.");
+    }
+    return;
+  }
+  fail(label + "." + criterionId + " has no structural external-evidence contract.");
+}
+
 function adapterSource(definition) {
   const references = definition.rubric.map((criterion) => criterion.source?.adapter);
   if (references.some((reference) => !reference)) {
@@ -209,7 +362,7 @@ function variant(value, definition, expectedSkill, releaseSha, label) {
     if (externalByCriterion.has(criterionId)) {
       fail(label + ".externalResults must bind each criterion at most once.");
     }
-    externalByCriterion.set(criterionId, external.evidence);
+    externalByCriterion.set(criterionId, external);
   }
 
   if (externalByCriterion.size !== passedExternalCriteria.length) {
@@ -217,9 +370,11 @@ function variant(value, definition, expectedSkill, releaseSha, label) {
   }
   const passedExternalSet = new Set(passedExternalCriteria);
   for (const criterionId of passedExternalCriteria) {
-    if (!externalByCriterion.has(criterionId)) {
+    const external = externalByCriterion.get(criterionId);
+    if (!external) {
       fail(label + ".externalResults is missing evidence for passing criterion " + criterionId + ".");
     }
+    validateExternalFacts(external, criterionId, definition, label);
   }
   for (const criterionId of externalByCriterion.keys()) {
     if (!passedExternalSet.has(criterionId)) {

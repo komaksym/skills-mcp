@@ -34,9 +34,11 @@ uses the upstream HTML delivery mechanism.
    repositories so one cannot contaminate the other.
 2. Fix each case's `model`, `task`, repository base SHA and fixture, `capabilities`,
    `prompt`, optional `followUp`, and rubric exactly as defined in `cases.json`.
-3. For an MCP workflow variant, run against a Skills MCP built from the recorded
-   `releaseSha`. Record the observed Skills MCP revision and how it was verified; a
-   typed SHA with no observation is not enough.
+3. For an MCP workflow variant, run against a Skills MCP built from the exact release
+   candidate commit being evaluated. Record that commit as `releaseSha`, record how the
+   running revision was verified, and pass the same exact commit to the validator as
+   `<evaluated-release-sha>`. Do not substitute the current PR head unless that is the
+   revision whose behavior the manual run actually exercised.
 4. For an external `adapt-codex-skill` observation, do **not** pretend the adapter is an
    MCP-loaded skill. Load the exact `docs/adapt-codex-skill.md` commit/path named by the
    rubric source and record evidence that this exact document was the behavioral
@@ -58,15 +60,32 @@ uses the upstream HTML delivery mechanism.
    behavior. Claims about GitHub mutations, tests, commits, PRs, labels, relationships,
    or worker execution require observed external evidence. For every passing rubric
    criterion marked `requiresExternalEvidence`, record exactly one `externalResults`
-   object with that criterion's `criterionId` and a non-empty durable `evidence`
-   string. Do not reuse one generic result for multiple unrelated criteria.
+   object with that criterion's `criterionId`, a non-empty durable `evidence` string,
+   and the criterion-specific machine-checkable facts described below. Do not reuse one
+   generic result for multiple unrelated criteria; one durable artifact may still
+   legitimately support multiple related criteria when each criterion records the
+   required facts.
 
-For the positive independent-worker observation, external evidence must identify at
-least two distinct isolated child workers and show concurrent/overlapping execution.
-Do not infer parallelism merely because two reviews were eventually returned, and do
-not consume one child result before dispatching the other. The negative companion case
-still proves that unavailable isolation causes strict review to stop rather than
-silently degrading to sequential parent-context passes.
+For GitHub publication criteria (`ready-for-agent` and `observed-publication`), record
+`facts.githubIssue` with the durable GitHub issue URL and the observed label list. The
+`ready-for-agent` criterion passes structurally only when that list contains
+`ready-for-agent`.
+
+For the positive independent-worker observation, record `facts.workers` with at least
+two distinct worker IDs. Each worker must record `isolated: true`, `directGithub: true`,
+and dispatch/start/completion timestamps. Also record `barrierSatisfied: true`, the
+barrier-completion timestamp, the first-result-consumption timestamp, and the
+synthesis-start timestamp. The validator requires overlapping worker intervals and
+requires the completed parent barrier before either result is consumed or synthesis
+starts. Do not infer parallelism merely because two reviews were eventually returned.
+
+For the negative strict-review observation, record facts showing
+`isolationAvailable: false`, `strictReviewStopped: true`, and
+`sequentialFallbackUsed: false`.
+
+For `inspects-current-target-environment`, the machine-checkable facts are the case's
+existing `targetEnvironment` records: every fixed repository, exact observed
+40-character commit, and non-empty read evidence must be present in fixed order.
 
 For observation cases, set `baseline` to `null` and use the adapted record to capture
 the direct observation. Do not invent a no-skill comparison for worker capability or
@@ -91,10 +110,15 @@ pass/fail with a short rationale. `externalResults` uses this criterion-bound sh
 [
   {
     "criterionId": "<rubric criterion id>",
-    "evidence": "<durable observed external result for this criterion>"
+    "evidence": "<durable observed external result for this criterion>",
+    "facts": {}
   }
 ]
 ```
+
+`facts` is required when the current criterion has an objective structure described
+above. The target-environment criterion uses `targetEnvironment` itself rather than
+duplicating those records in `facts`.
 
 There must be exactly one such entry for every passing rubric criterion whose fixed
 case definition has `requiresExternalEvidence: true`, with no duplicate or unrelated
@@ -137,13 +161,15 @@ should state what was directly observed instead. A variant may legitimately fail
 record must say why rather than turning `not-observed` into success. Such a record is
 useful evidence, but it does not pass the release gate.
 
-Validate the completed record with:
+Validate the completed record against the exact Skills MCP release candidate whose
+behavior the run exercised:
 
 ```bash
-node evals/release/validate-run.mjs path/to/completed-run.json
+node evals/release/validate-run.mjs path/to/completed-run.json <evaluated-release-sha>
 ```
 
-The validator checks comparability, evidence structure, and release-gate completeness.
-A completed gate is rejected unless every required case passes, including both sides
-of the paired case. It does not independently judge model quality and does not execute
-model calls.
+The validator rejects the record unless `run.releaseSha` equals that explicit
+candidate SHA, then checks comparability, criterion-specific external evidence, and
+release-gate completeness. A completed gate is rejected unless every required case
+passes, including both sides of the paired case. It does not independently judge model
+quality and does not execute model calls.
