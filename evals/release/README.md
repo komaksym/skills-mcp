@@ -35,10 +35,11 @@ uses the upstream HTML delivery mechanism.
 2. Fix each case's `model`, `task`, repository base SHA and fixture, `capabilities`,
    `prompt`, optional `followUp`, and rubric exactly as defined in `cases.json`.
 3. For an MCP workflow variant, run against a Skills MCP built from the exact release
-   candidate commit being evaluated. Record that commit as `releaseSha`, record how the
-   running revision was verified, and pass the same exact commit to the validator as
-   `<evaluated-release-sha>`. Do not substitute the current PR head unless that is the
-   revision whose behavior the manual run actually exercised.
+   candidate commit being evaluated. The observed Skills MCP revision must equal the
+   recorded `releaseSha`; record how the running revision was verified, and pass the
+   same exact commit to the validator as `<evaluated-release-sha>`. Do not substitute
+   the current PR head unless that is the revision whose behavior the manual run
+   actually exercised.
 4. For an external `adapt-codex-skill` observation, do **not** pretend the adapter is an
    MCP-loaded skill. Load the exact `docs/adapt-codex-skill.md` commit/path named by the
    rubric source and record evidence that this exact document was the behavioral
