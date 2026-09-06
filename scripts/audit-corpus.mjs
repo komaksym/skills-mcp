@@ -1,7 +1,8 @@
 import { Buffer } from "node:buffer";
 import console from "node:console";
+import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
-import { readdir, readFile } from "node:fs/promises";
+import { lstat, readdir, readFile, readlink } from "node:fs/promises";
 import process from "node:process";
 
 import { pinnedSourceProvenance } from "../src/provenance-state.mjs";
@@ -187,6 +188,83 @@ async function runtimeSizes(root) {
   return sizes;
 }
 
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+async function bundleSnapshot(root, name) {
+  const bundleRoot = join(root, name);
+  const files = new Map();
+
+  async function visit(directory, prefix) {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const relative = prefix ? prefix + "/" + entry.name : entry.name;
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(path, relative);
+      } else if (entry.isFile()) {
+        files.set(relative, "file:" + sha256(await readFile(path)));
+      } else if (entry.isSymbolicLink()) {
+        files.set(relative, "symlink:" + sha256(await readlink(path)));
+      }
+    }
+    return true;
+  }
+
+  return (await visit(bundleRoot, "")) ? files : null;
+}
+
+async function baselineInvariantErrors(root, baselineRoot) {
+  let entries;
+  try {
+    entries = await readdir(baselineRoot, { withFileTypes: true });
+  } catch {
+    return ["cannot read corpus baseline: " + baselineRoot];
+  }
+
+  const errors = [];
+  for (const entry of entries
+    .filter((item) => item.isDirectory())
+    .sort((left, right) => left.name.localeCompare(right.name))) {
+    const baseline = await bundleSnapshot(baselineRoot, entry.name);
+    let currentEntry;
+    try {
+      currentEntry = await lstat(join(root, entry.name));
+    } catch {
+      errors.push("existing baseline bundle removed: " + entry.name);
+      continue;
+    }
+    if (!currentEntry.isDirectory()) {
+      errors.push("existing baseline bundle changed: " + entry.name);
+      continue;
+    }
+    const current = await bundleSnapshot(root, entry.name);
+    if (!current) {
+      errors.push("existing baseline bundle removed: " + entry.name);
+      continue;
+    }
+    if (!baseline) {
+      errors.push("cannot read baseline bundle: " + entry.name);
+      continue;
+    }
+
+    const paths = new Set([...baseline.keys(), ...current.keys()]);
+    for (const path of [...paths].sort()) {
+      if (baseline.get(path) !== current.get(path)) {
+        errors.push("existing baseline bundle changed: " + entry.name + "/" + path);
+      }
+    }
+  }
+  return errors;
+}
+
 function signedBytes(value) {
   return (value >= 0 ? "+" : "") + value + " bytes vs baseline";
 }
@@ -269,9 +347,11 @@ export async function auditCorpus(root) {
 
 const root = process.argv[2] ?? "skills";
 const result = await auditCorpus(root);
-const baselineSizes = process.env.CORPUS_BASELINE_ROOT
-  ? await runtimeSizes(process.env.CORPUS_BASELINE_ROOT)
-  : null;
+const baselineRoot = process.env.CORPUS_BASELINE_ROOT ?? null;
+const baselineSizes = baselineRoot ? await runtimeSizes(baselineRoot) : null;
+if (baselineRoot) {
+  result.errors.push(...await baselineInvariantErrors(root, baselineRoot));
+}
 const publicCount = result.skills.filter((skill) => skill.visibility === "public").length;
 const hiddenCount = result.skills.filter((skill) => skill.visibility === "hidden").length;
 console.log(
