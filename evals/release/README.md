@@ -56,8 +56,10 @@ uses the upstream HTML delivery mechanism.
    other fallback declared by the pinned behavioral source.
 9. Record relevant model output and any durable external result needed to verify the
    behavior. Claims about GitHub mutations, tests, commits, PRs, labels, relationships,
-   or worker execution require observed external evidence. A rubric criterion marked
-   `requiresExternalEvidence` cannot pass with an empty `externalResults` record.
+   or worker execution require observed external evidence. For every passing rubric
+   criterion marked `requiresExternalEvidence`, record exactly one `externalResults`
+   object with that criterion's `criterionId` and a non-empty durable `evidence`
+   string. Do not reuse one generic result for multiple unrelated criteria.
 
 For the positive independent-worker observation, external evidence must identify at
 least two distinct isolated child workers and show concurrent/overlapping execution.
@@ -83,9 +85,22 @@ evidence, and completion of the Adaptation Spec. Do not snapshot exact wording.
 Copy `run-template.json` to a release record outside routine CI artifacts. For every
 variant record, capture the exact model, repository URL/base, capabilities, relevant
 output and external results, every rubric judgment with evidence, and overall
-pass/fail with a short rationale. `targetEnvironment` is an empty array unless the case
-defines required target repositories; when required, it must contain exactly those
-repositories in the fixed order with the observed commit and read evidence.
+pass/fail with a short rationale. `externalResults` uses this criterion-bound shape:
+
+```json
+[
+  {
+    "criterionId": "<rubric criterion id>",
+    "evidence": "<durable observed external result for this criterion>"
+  }
+]
+```
+
+There must be exactly one such entry for every passing rubric criterion whose fixed
+case definition has `requiresExternalEvidence: true`, with no duplicate or unrelated
+criterion IDs. `targetEnvironment` is an empty array unless the case defines required
+target repositories; when required, it must contain exactly those repositories in the
+fixed order with the observed commit and read evidence.
 
 Evidence-source fields are mutually exclusive:
 
