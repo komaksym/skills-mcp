@@ -173,6 +173,9 @@ function variant(value, definition, expectedSkill, releaseSha, label) {
   }
 
   if (!Array.isArray(item.externalResults)) fail(label + ".externalResults must be an array.");
+  for (let index = 0; index < item.externalResults.length; index += 1) {
+    text(item.externalResults[index], label + ".externalResults[" + index + "]");
+  }
   const output = typeof item.output === "string" ? item.output.trim() : "";
   if (output === "" && item.externalResults.length === 0) {
     fail(label + " must record relevant output or an external result.");
