@@ -7,9 +7,10 @@ manual gate is incomplete. Keep the overall status at `NOT EXERCISED` until ever
 case in the current five-case suite has one truthful completed observation record
 that validates with `node evals/release/validate-run.mjs`.
 
-The historical three-case record from 2026-08-31 remains useful evidence for the MCP
-workflow cases, but it predates the two `adapt-codex-skill` observations now required
-by `evals/release/cases.json`. It therefore cannot establish the current release PASS.
+The historical records from 2026-08-29 to 2026-08-31 remain useful evidence, but they
+predate the current-head positive independent-worker observation and the two
+`adapt-codex-skill` observations now required by `evals/release/cases.json`. They
+therefore cannot establish the current release PASS.
 
 ## Historical local and ChatGPT Web evidence — 2026-08-29 to 2026-08-31
 
@@ -73,9 +74,9 @@ It recorded the then-current suite at behavior head
 - `code-review-stop-without-isolation` observed truthful stopping when independent
   direct-GitHub child contexts were declared unavailable.
 
-Those three observations remain historical evidence for those fixed behaviors. They
-do **not** satisfy the current suite because the suite now also requires both external
-adapter observations below.
+Those observations remain historical evidence for those fixed behaviors. They do
+**not** satisfy the current suite because the current gate now requires a fresh
+positive independent-worker observation and both external adapter observations below.
 
 ## Current targeted manual gate
 
@@ -83,25 +84,35 @@ Follow `evals/release/README.md` exactly and record one result for every case in
 current five-case suite:
 
 1. `representative-to-spec`
-2. `grill-with-docs-dependency-timing`
+2. `code-review-independent-workers`
 3. `code-review-stop-without-isolation`
 4. `adapt-codex-skill-missing-supporting-document`
 5. `adapt-codex-skill-representative-success`
 
+The positive code-review observation must run the current Skills MCP release revision,
+identify at least two genuinely independent direct-GitHub child workers, demonstrate
+overlapping execution rather than sequential simulation, and show that the parent
+waited for the independent-review barrier before synthesis. The historical child
+canary is not a substitute for this current-head observation.
+
 The two adapter observations use the pinned external
 `docs/adapt-codex-skill.md` as their behavioral source. They are not Skills MCP-loaded
 workflow observations and must record adapter evidence separately from Skills MCP
-evidence.
+evidence. The pinned adapter/source tree is oracle-free: the representative fixture
+does not contain a pre-authored expected Adaptation Spec.
 
 The missing-Supporting-Document observation must name the missing required document
 and stop before a completed Adaptation Spec. The successful observation must run the
-pinned adapter against the complete representative v2 bundle and semantically verify
-faithful preservation, required runtime mappings, deterministic helper preservation,
-Dependency Skill identity/timing, explicit absent Source Provenance, and a complete
-issue-ready Adaptation Spec. Exact wording snapshots are not evidence of semantic
-fidelity.
+pinned adapter against the complete representative v2 bundle and verify faithful
+preservation, required runtime mappings, deterministic helper preservation, Dependency
+Skill identity/timing, explicit absent Source Provenance, and a complete issue-ready
+Adaptation Spec. It must also record the observed current commit and direct read
+evidence for every target repository named by `targetEnvironmentRepositories`; output
+semantics or remembered mappings alone are insufficient. Exact wording snapshots are
+not evidence of semantic fidelity.
 
-No completed five-case manual record is committed yet. Do not infer either adapter
+No completed five-case manual record is committed yet. Do not infer the current-head
+independent-worker observation from its historical canary, do not infer either adapter
 observation from deterministic fixture tests, and do not manufacture a PASS from the
 historical three-case record.
 
@@ -111,13 +122,17 @@ historical three-case record.
    loopback health response.
 2. For MCP workflow cases, record the observed Skills MCP revision and how it was
    verified.
-3. For external adapter cases, load the exact pinned adapter commit/path and record
+3. For the positive code-review case, record distinct worker identities plus evidence
+   of overlapping execution and barrier completion before synthesis.
+4. For external adapter cases, load the exact pinned adapter commit/path and record
    evidence that this document was the behavioral source; do not represent it as an
    MCP-loaded skill.
-4. Use fresh contexts and the fixed model, prompt, repository context, capabilities,
+5. For any case with `targetEnvironmentRepositories`, directly inspect every required
+   target repository and record its observed current commit and read evidence.
+6. Use fresh contexts and the fixed model, prompt, repository context, capabilities,
    and rubric from `evals/release/cases.json`.
-5. Record observed external results whenever a criterion requires them.
-6. Validate the completed record with:
+7. Record observed external results whenever a criterion requires them.
+8. Validate the completed record with:
 
 ```sh
 node evals/release/validate-run.mjs path/to/completed-run.json
@@ -139,7 +154,7 @@ npm run corpus:check
 ```
 
 Deterministic CI proves repository mechanics; it does not substitute for stochastic
-manual adapter observations.
+manual adapter or independent-worker observations.
 
 ## Maintenance scope
 
@@ -150,6 +165,6 @@ post-release maintenance work and is not a blocker for this release proof.
 
 - Overall status: `NOT EXERCISED`
 - Historical ChatGPT Web / tunnel smoke: PASS for the observations recorded above; this does not complete the expanded current manual gate
-- Historical strict code-review smoke: PASS for the recorded isolated-child canary; rerun only when a current-head gate requires it
+- Historical strict code-review smoke: PASS for the recorded isolated-child canary; the current-head positive-worker gate is still unexercised
 - Deterministic corpus gates: require fresh CI evidence on the final PR head before completion
-- Targeted manual release evaluations: `NOT EXERCISED` — the historical three-case record does not satisfy the current five-case suite; both pinned external-adapter observations and one complete validated five-case record are still required
+- Targeted manual release evaluations: `NOT EXERCISED` — the historical evidence does not satisfy the current five-case suite; a current-head independent-worker observation, both pinned external-adapter observations, and one complete validated five-case record are still required
