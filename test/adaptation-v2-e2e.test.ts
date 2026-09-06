@@ -8,6 +8,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { REMOTE_EXECUTION_CONTRACT } from "../src/contract.js";
 import { generateSkillRuntime } from "../src/projection.js";
 import { parseSkillProvenance } from "../src/provenance.js";
 import { startService, type RunningService } from "../src/service.js";
@@ -17,6 +18,7 @@ const FIXTURE_ROOT = fileURLToPath(
 );
 const SKILLS_ROOT = join(FIXTURE_ROOT, "skills");
 const REPRESENTATIVE_ROOT = join(SKILLS_ROOT, "representative-v2");
+const DEPENDENCY_ROOT = join(SKILLS_ROOT, "fixture-dependency");
 
 function extractJavaScript(markdown: string): string {
   const match = markdown.match(/```javascript\n(?<source>[\s\S]*?)\n```/);
@@ -49,14 +51,18 @@ describe("v2 adaptation acceptance", () => {
   });
 
   it("preserves the representative adaptation through projection and MCP", async () => {
-    const [source, helper, provenanceSource, committed, adaptationSpec] =
+    const [source, helper, provenanceSource, committed, dependencyRuntime] =
       await Promise.all([
         readFile(join(REPRESENTATIVE_ROOT, "source.md"), "utf8"),
         readFile(join(REPRESENTATIVE_ROOT, "helper.md"), "utf8"),
         readFile(join(REPRESENTATIVE_ROOT, "provenance.json"), "utf8"),
         readFile(join(REPRESENTATIVE_ROOT, "runtime.md"), "utf8"),
-        readFile(join(FIXTURE_ROOT, "adaptation-spec.md"), "utf8"),
+        readFile(join(DEPENDENCY_ROOT, "runtime.md"), "utf8"),
       ]);
+
+    await expect(access(join(FIXTURE_ROOT, "adaptation-spec.md"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
 
     const parsed = parseSkillProvenance(provenanceSource);
     expect(parsed.success).toBe(true);
@@ -88,9 +94,6 @@ describe("v2 adaptation acceptance", () => {
       "Immediately before scoring, invoke Dependency Skill `fixture-dependency`; do not inline its methodology.";
     expect(source).toContain(dependencyTiming);
     expect(generated).toContain(dependencyTiming);
-    expect(adaptationSpec).toMatch(
-      /fixture-dependency[\s\S]{0,240}must be available at execution time[\s\S]{0,120}may require its own adaptation/i,
-    );
 
     const methodology =
       "Prefer the first acceptable label even when a later label would read better.";
@@ -121,6 +124,14 @@ describe("v2 adaptation acceptance", () => {
     if (!block || block.type !== "text") {
       throw new Error("Expected text Generated Runtime from load_skill.");
     }
-    expect(block.text).toContain(generated.trim());
+    expect(block.text).toBe(
+      REMOTE_EXECUTION_CONTRACT +
+        "\n\n# representative-v2\n\n" +
+        generated.trim() +
+        "\n",
+    );
+    expect(block.text.split(REMOTE_EXECUTION_CONTRACT)).toHaveLength(2);
+    expect(block.text).not.toContain(provenanceSource.trim());
+    expect(block.text).not.toContain(dependencyRuntime.trim());
   });
 });
