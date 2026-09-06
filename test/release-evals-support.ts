@@ -10,6 +10,7 @@ export const WORKFLOW_REPOSITORY = "komaksym/chatgpt-chat-skills-mcp";
 export const WORKFLOW_PIN = "de37f7c16bb2ec229f13d3edbde8cdcb3dcfe246";
 export const ADAPTER_REPOSITORY = "komaksym/skills-mcp";
 export const ADAPTER_PIN = "94226fc2a9a37039ba31c7bb58676aca531154eb";
+export const RELEASE_SHA = "a".repeat(40);
 
 export interface SourceReference {
   commit: string;
@@ -60,7 +61,7 @@ export async function loadReleaseSuite(): Promise<Suite> {
 }
 
 export function completedReleaseRun(data: Suite): Record<string, unknown> {
-  const releaseSha = "a".repeat(40);
+  const releaseSha = RELEASE_SHA;
   return {
     mode: "manual-release",
     runId: "test-run",
@@ -136,7 +137,10 @@ export function completedReleaseRun(data: Suite): Record<string, unknown> {
   };
 }
 
-export async function validateReleaseRun(run: unknown): Promise<{
+export async function validateReleaseRun(
+  run: unknown,
+  expectedReleaseSha = RELEASE_SHA,
+): Promise<{
   status: number | null;
   stdout: string;
   stderr: string;
@@ -146,7 +150,7 @@ export async function validateReleaseRun(run: unknown): Promise<{
   const validatorPath = fileURLToPath(new URL("validate-run.mjs", RELEASE_ROOT));
   try {
     await writeFile(runPath, JSON.stringify(run), "utf8");
-    const result = spawnSync(process.execPath, [validatorPath, runPath], {
+    const result = spawnSync(process.execPath, [validatorPath, runPath, expectedReleaseSha], {
       encoding: "utf8",
     });
     return {
