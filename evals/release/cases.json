@@ -139,9 +139,9 @@
       "task": "Observe whether the external adapter stops truthfully when an upstream bundle is missing a required Supporting Document.",
       "repositoryContext": {
         "sourceRepository": "komaksym/skills-mcp",
-        "baseSha": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+        "baseSha": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
         "writes": false,
-        "reset": "Use a fresh read-only conversation pinned to this commit. Use only the incomplete bundle embedded in the prompt as the adaptation input."
+        "reset": "Use a fresh read-only conversation pinned to this oracle-free commit. Use only the incomplete bundle embedded in the prompt as the adaptation input."
       },
       "capabilities": [
         "GitHub repository read",
@@ -153,7 +153,7 @@
           "id": "missing-supporting-document-named",
           "source": {
             "adapter": {
-              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "commit": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
               "path": "docs/adapt-codex-skill.md",
               "section": "Inspect"
             },
@@ -165,7 +165,7 @@
           "id": "stop-before-adaptation-spec",
           "source": {
             "adapter": {
-              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "commit": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
               "path": "docs/adapt-codex-skill.md",
               "section": "Inspect"
             },
@@ -185,7 +185,7 @@
         "sourceRepository": "komaksym/skills-mcp",
         "baseSha": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
         "writes": false,
-        "reset": "Use a fresh read-only conversation pinned to this oracle-free fixture commit. Load the adapter separately from docs/adapt-codex-skill.md at its fixed adapter commit, then inspect the complete representative bundle and current target repositories."
+        "reset": "Use a fresh read-only conversation pinned to this oracle-free fixture commit. Load the adapter separately from docs/adapt-codex-skill.md at the same fixed oracle-free adapter commit, then inspect the complete representative bundle and current target repositories."
       },
       "targetEnvironmentRepositories": [
         "komaksym/chatgpt-chat-skills-mcp",
@@ -196,13 +196,13 @@
         "GitHub repository read across the source and referenced target repositories",
         "external adapt-codex-skill loaded from docs/adapt-codex-skill.md at the pinned commit"
       ],
-      "prompt": "Run `adapt-codex-skill` on the complete representative bundle at `test/fixtures/adaptation-v2/skills/representative-v2/` in the pinned source-fixture repository. Treat `source.md` as the bundle entrypoint, `helper.md` as its required Supporting Document, `assets/report.key` as its Repository Asset, and `fixture-dependency` as the separate Dependency Skill referenced by the entrypoint. The fixture intentionally has no canonical upstream GitHub source. Inspect the current target repositories required by the adapter and record the exact current commit observed for each required target repository as evaluation evidence, then return only the resulting Adaptation Spec. No expected-output Adaptation Spec exists in the pinned source fixture.",
+      "prompt": "Run `adapt-codex-skill` on the complete representative bundle at `test/fixtures/adaptation-v2/skills/representative-v2/` in the pinned source-fixture repository. Treat `source.md` as the bundle entrypoint, `helper.md` as its required Supporting Document, `assets/report.key` as its Repository Asset, and `fixture-dependency` as the separate Dependency Skill referenced by the entrypoint. The fixture intentionally has no canonical upstream GitHub source. Inspect the current target repositories required by the adapter and record the exact current commit observed for each required target repository as evaluation evidence, then return only the resulting Adaptation Spec. No expected-output Adaptation Spec exists in the pinned source fixture or adapter tree.",
       "rubric": [
         {
           "id": "inspects-current-target-environment",
           "source": {
             "adapter": {
-              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "commit": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
               "path": "docs/adapt-codex-skill.md",
               "section": "Inspect"
             },
@@ -215,7 +215,7 @@
           "id": "preserves-unforced-methodology",
           "source": {
             "adapter": {
-              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "commit": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
               "path": "docs/adapt-codex-skill.md",
               "section": "Adapt"
             },
@@ -227,7 +227,7 @@
           "id": "maps-required-runtime-seams",
           "source": {
             "adapter": {
-              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "commit": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
               "path": "docs/adapt-codex-skill.md",
               "section": "Adapt"
             },
@@ -239,7 +239,7 @@
           "id": "preserves-helper-and-dependency-boundary",
           "source": {
             "adapter": {
-              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "commit": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
               "path": "docs/adapt-codex-skill.md",
               "section": "Adapt"
             },
@@ -251,7 +251,7 @@
           "id": "records-absent-source-provenance",
           "source": {
             "adapter": {
-              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "commit": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
               "path": "docs/adapt-codex-skill.md",
               "section": "Inspect"
             },
@@ -263,7 +263,7 @@
           "id": "emits-complete-adaptation-spec",
           "source": {
             "adapter": {
-              "commit": "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf",
+              "commit": "b5ad0fc3aff21b05a49a3157a740f436166137dc",
               "path": "docs/adapt-codex-skill.md",
               "section": "Output"
             },
