@@ -60,6 +60,52 @@ export async function loadReleaseSuite(): Promise<Suite> {
   ) as Suite;
 }
 
+function externalFacts(criterionId: string): Record<string, unknown> | undefined {
+  if (criterionId === "ready-for-agent" || criterionId === "observed-publication") {
+    return {
+      githubIssue: {
+        url: "https://github.com/example/repository/issues/1",
+        state: "open",
+        labels: ["ready-for-agent"],
+      },
+    };
+  }
+  if (criterionId === "independent-workers-parallel") {
+    return {
+      workers: [
+        {
+          id: "standards-worker",
+          isolated: true,
+          directGithub: true,
+          dispatchedAt: "2026-09-06T20:00:00.000Z",
+          startedAt: "2026-09-06T20:00:01.000Z",
+          completedAt: "2026-09-06T20:00:05.000Z",
+        },
+        {
+          id: "spec-worker",
+          isolated: true,
+          directGithub: true,
+          dispatchedAt: "2026-09-06T20:00:00.500Z",
+          startedAt: "2026-09-06T20:00:02.000Z",
+          completedAt: "2026-09-06T20:00:06.000Z",
+        },
+      ],
+      barrierSatisfied: true,
+      barrierCompletedAt: "2026-09-06T20:00:07.000Z",
+      firstResultConsumedAt: "2026-09-06T20:00:08.000Z",
+      synthesisStartedAt: "2026-09-06T20:00:09.000Z",
+    };
+  }
+  if (criterionId === "stop-instead-degrade") {
+    return {
+      isolationAvailable: false,
+      strictReviewStopped: true,
+      sequentialFallbackUsed: false,
+    };
+  }
+  return undefined;
+}
+
 export function completedReleaseRun(data: Suite): Record<string, unknown> {
   const releaseSha = RELEASE_SHA;
   return {
@@ -74,10 +120,14 @@ export function completedReleaseRun(data: Suite): Record<string, unknown> {
       }));
       const externalResults = item.rubric
         .filter((criterion) => criterion.requiresExternalEvidence)
-        .map((criterion) => ({
-          criterionId: criterion.id,
-          evidence: "Observed external fixture result for " + criterion.id + ".",
-        }));
+        .map((criterion) => {
+          const facts = externalFacts(criterion.id);
+          return {
+            criterionId: criterion.id,
+            evidence: "Observed external fixture result for " + criterion.id + ".",
+            ...(facts === undefined ? {} : { facts }),
+          };
+        });
       const repository = {
         sourceRepository: item.repositoryContext.sourceRepository,
         baseSha: item.repositoryContext.baseSha,
