@@ -71,9 +71,12 @@ export function completedReleaseRun(data: Suite): Record<string, unknown> {
         judgment: "pass",
         evidence: "Observed fixture evidence.",
       }));
-      const externalResults = item.rubric.some((criterion) => criterion.requiresExternalEvidence)
-        ? ["Observed external fixture result."]
-        : [];
+      const externalResults = item.rubric
+        .filter((criterion) => criterion.requiresExternalEvidence)
+        .map((criterion) => ({
+          criterionId: criterion.id,
+          evidence: "Observed external fixture result for " + criterion.id + ".",
+        }));
       const repository = {
         sourceRepository: item.repositoryContext.sourceRepository,
         baseSha: item.repositoryContext.baseSha,
@@ -111,7 +114,7 @@ export function completedReleaseRun(data: Suite): Record<string, unknown> {
         targetEnvironment: targetEnvironment.map((entry) => ({ ...entry })),
         capabilities: item.capabilities,
         output: "Observed output.",
-        externalResults: [...externalResults],
+        externalResults: externalResults.map((entry) => ({ ...entry })),
         rubric: rubric.map((entry) => ({ ...entry })),
         pass: true,
         rationale: "Observed fixture completed.",
