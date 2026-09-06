@@ -135,7 +135,19 @@ describe("complete Mechanical Projection corpus audit", () => {
     expect(result.stdout).toContain("runtime alpha:");
   });
 
-  it("reports runtime size changes against a baseline without a hard cap", async () => {
+  it("accepts byte-identical existing bundles against the prepared baseline", async () => {
+    const baselineRoot = await temp();
+    const root = await temp();
+    await bundle(baselineRoot, "alpha");
+    await bundle(root, "alpha");
+
+    const result = await run(root, baselineRoot);
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+  });
+
+  it("rejects byte changes to an existing baseline bundle", async () => {
     const baselineRoot = await temp();
     const root = await temp();
     await bundle(baselineRoot, "alpha", { runtime: "old\n" });
@@ -143,10 +155,22 @@ describe("complete Mechanical Projection corpus audit", () => {
 
     const result = await run(root, baselineRoot);
 
-    expect(result.code).toBe(0);
+    expect(result.code).toBe(1);
     expect(result.stdout).toContain(
       "runtime alpha: 9 bytes (~3 tokens), +5 bytes vs baseline",
     );
+    expect(result.stderr).toContain("existing baseline bundle changed: alpha/runtime.md");
+  });
+
+  it("rejects removal of an existing baseline bundle", async () => {
+    const baselineRoot = await temp();
+    const root = await temp();
+    await bundle(baselineRoot, "alpha");
+
+    const result = await run(root, baselineRoot);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("existing baseline bundle removed: alpha");
   });
 
   it("rejects the retired free-text provenance form", async () => {
