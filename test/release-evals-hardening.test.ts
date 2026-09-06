@@ -1,120 +1,20 @@
-import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const ROOT = new URL("../evals/release/", import.meta.url);
-const WORKFLOW_REPOSITORY = "komaksym/chatgpt-chat-skills-mcp";
-const WORKFLOW_PIN = "de37f7c16bb2ec229f13d3edbde8cdcb3dcfe246";
-const ADAPTER_REPOSITORY = "komaksym/skills-mcp";
-const ADAPTER_PIN = "976f7cd0ec7236a1e2375f00ad59c2ba5b063fcf";
-
-interface EvaluationCase {
-  id: string;
-  mode: "paired" | "observation";
-  workflow: string;
-  model: string;
-  task: string;
-  prompt: string;
-  followUp?: string;
-  repositoryContext: {
-    sourceRepository: string;
-    baseSha: string;
-    writes: boolean;
-    reset: string;
-  };
-  capabilities: string[];
-  rubric: Array<{
-    id: string;
-    requiresExternalEvidence?: boolean;
-    source: {
-      adapter?: { commit: string; path: string; section: string };
-    };
-  }>;
-}
-
-interface Suite {
-  cases: EvaluationCase[];
-}
-
-async function suite(): Promise<Suite> {
-  return JSON.parse(await readFile(new URL("cases.json", ROOT), "utf8")) as Suite;
-}
-
-function completedRun(data: Suite): Record<string, unknown> {
-  const releaseSha = "a".repeat(40);
-  return {
-    mode: "manual-release",
-    runId: "hardening-test-run",
-    releaseSha,
-    cases: data.cases.map((item, index) => {
-      const isAdapter = item.workflow === "adapt-codex-skill";
-      const rubric = item.rubric.map((criterion) => ({
-        id: criterion.id,
-        judgment: "pass",
-        evidence: "Observed fixture evidence.",
-      }));
-      const externalResults = item.rubric.some((criterion) => criterion.requiresExternalEvidence)
-        ? ["Observed external fixture result."]
-        : [];
-      const repository = {
-        url: `https://example.test/repository-${index}`,
-        sourceRepository: item.repositoryContext.sourceRepository,
-        baseSha: item.repositoryContext.baseSha,
-      };
-      const evidence = isAdapter
-        ? {
-            skillsMcp: null,
-            adapter: {
-              repository: ADAPTER_REPOSITORY,
-              commit: ADAPTER_PIN,
-              path: "docs/adapt-codex-skill.md",
-              evidence: "Observed the exact pinned adapter document before the run.",
-            },
-          }
-        : {
-            skillsMcp: {
-              repository: WORKFLOW_REPOSITORY,
-              releaseSha,
-              evidence: "Observed fixture service revision.",
-            },
-            adapter: null,
-          };
-      const variant = (skill: string | null, suffix: string) => ({
-        skill,
-        model: item.model,
-        ...evidence,
-        repository: { ...repository, url: `${repository.url}-${suffix}` },
-        capabilities: item.capabilities,
-        output: "Observed output.",
-        externalResults: [...externalResults],
-        rubric: rubric.map((entry) => ({ ...entry })),
-        pass: true,
-        rationale: "Observed condition passed.",
-      });
-
-      return {
-        caseId: item.id,
-        mode: item.mode,
-        task: item.task,
-        prompt: item.prompt,
-        followUp: item.followUp ?? null,
-        baseline: item.mode === "paired" ? variant(null, "baseline") : null,
-        adapted: variant(item.workflow, "adapted"),
-        pass: true,
-        rationale: "All fixed criteria passed.",
-        comparison: item.mode === "paired" ? "Observed behavioral delta." : "Direct observation.",
-      };
-    }),
-  };
-}
+import {
+  ADAPTER_PIN,
+  ADAPTER_REPOSITORY,
+  WORKFLOW_PIN,
+  WORKFLOW_REPOSITORY,
+  completedReleaseRun,
+  loadReleaseSuite,
+  validateReleaseRun,
+} from "./release-evals-support.js";
 
 describe("release evaluation hardening", () => {
   it("defines both adapter failure and successful-adaptation observations", async () => {
-    const data = await suite();
+    const data = await loadReleaseSuite();
     const adapterCases = data.cases.filter((item) => item.workflow === "adapt-codex-skill");
 
     expect(data.cases).toHaveLength(5);
@@ -128,6 +28,7 @@ describe("release evaluation hardening", () => {
         ?.rubric.map((criterion) => criterion.id),
     ).toEqual(
       expect.arrayContaining([
+        "inspects-current-target-environment",
         "preserves-unforced-methodology",
         "maps-required-runtime-seams",
         "preserves-helper-and-dependency-boundary",
@@ -137,139 +38,161 @@ describe("release evaluation hardening", () => {
     );
   });
 
-  it("pins repository context by case type", async () => {
-    const data = await suite();
+  it("pins repository context by case type without exposing a successful adapter oracle", async () => {
+    const data = await loadReleaseSuite();
 
     for (const item of data.cases) {
-      if (item.workflow === "adapt-codex-skill") {
-        expect(item.repositoryContext).toMatchObject({
-          sourceRepository: ADAPTER_REPOSITORY,
-          baseSha: ADAPTER_PIN,
-        });
-      } else {
+      if (item.workflow !== "adapt-codex-skill") {
         expect(item.repositoryContext).toMatchObject({
           sourceRepository: WORKFLOW_REPOSITORY,
           baseSha: WORKFLOW_PIN,
         });
       }
     }
+
+    const missing = data.cases.find(
+      (item) => item.id === "adapt-codex-skill-missing-supporting-document",
+    );
+    expect(missing?.repositoryContext).toMatchObject({
+      sourceRepository: ADAPTER_REPOSITORY,
+      baseSha: ADAPTER_PIN,
+    });
+
+    const success = data.cases.find(
+      (item) => item.id === "adapt-codex-skill-representative-success",
+    );
+    expect(success?.repositoryContext.sourceRepository).toBe(ADAPTER_REPOSITORY);
+    expect(success?.repositoryContext.baseSha).not.toBe(ADAPTER_PIN);
+    expect(success?.prompt).toContain("No expected-output Adaptation Spec exists");
   });
 
-  it("uses adapter behavioral sections for the successful observation", async () => {
-    const data = await suite();
-    const success = data.cases.find((item) => item.id === "adapt-codex-skill-representative-success");
+  it("requires positive and negative independent-worker observations", async () => {
+    const data = await loadReleaseSuite();
+    const reviewCases = data.cases.filter((item) => item.workflow === "code-review");
+
+    expect(reviewCases.map((item) => item.id)).toEqual([
+      "code-review-independent-workers",
+      "code-review-stop-without-isolation",
+    ]);
+    expect(
+      reviewCases
+        .find((item) => item.id === "code-review-independent-workers")
+        ?.rubric.map((criterion) => criterion.id),
+    ).toContain("independent-workers-parallel");
+  });
+
+  it("requires concrete target repositories for the successful adapter observation", async () => {
+    const data = await loadReleaseSuite();
+    const success = data.cases.find(
+      (item) => item.id === "adapt-codex-skill-representative-success",
+    );
     if (!success) throw new Error("expected successful adapter observation");
 
-    expect(success.rubric.map((criterion) => criterion.source.adapter?.section)).toEqual(
-      expect.arrayContaining(["Adapt", "Output"]),
-    );
+    expect(success.targetEnvironmentRepositories).toEqual([
+      "komaksym/chatgpt-chat-skills-mcp",
+      "komaksym/mcps-launcher",
+      "komaksym/chrome-browser-mcp",
+    ]);
   });
 
   it("validates adapter evidence independently from Skills MCP evidence", async () => {
-    const data = await suite();
-    const directory = await mkdtemp(join(tmpdir(), "release-evals-hardening-"));
-    const runPath = join(directory, "run.json");
-    const validatorPath = fileURLToPath(new URL("validate-run.mjs", ROOT));
+    const data = await loadReleaseSuite();
+    const run = completedReleaseRun(data);
+    const valid = await validateReleaseRun(run);
+    expect(valid.status).toBe(0);
+    expect(valid.stdout).toContain("Validated 5 manual release evaluations.");
 
-    try {
-      const run = completedRun(data);
-      await writeFile(runPath, JSON.stringify(run), "utf8");
-      const valid = spawnSync(process.execPath, [validatorPath, runPath], { encoding: "utf8" });
-      expect(valid.status).toBe(0);
-      expect(valid.stdout).toContain("Validated 5 manual release evaluations.");
+    const invalid = run as {
+      cases: Array<{
+        caseId: string;
+        adapted: { skillsMcp: unknown; adapter: unknown };
+      }>;
+    };
+    const adapterCase = invalid.cases.find(
+      (item) => item.caseId === "adapt-codex-skill-representative-success",
+    );
+    if (!adapterCase) throw new Error("expected adapter evaluation case");
+    adapterCase.adapted.adapter = null;
+    adapterCase.adapted.skillsMcp = {
+      repository: WORKFLOW_REPOSITORY,
+      releaseSha: "a".repeat(40),
+      evidence: "Wrong evidence source.",
+    };
 
-      const invalid = run as {
-        cases: Array<{
-          caseId: string;
-          adapted: {
-            skillsMcp: unknown;
-            adapter: unknown;
-          };
-        }>;
-      };
-      const adapterCase = invalid.cases.find(
-        (item) => item.caseId === "adapt-codex-skill-representative-success",
-      );
-      if (!adapterCase) throw new Error("expected adapter evaluation case");
-      adapterCase.adapted.adapter = null;
-      adapterCase.adapted.skillsMcp = {
-        repository: WORKFLOW_REPOSITORY,
-        releaseSha: "a".repeat(40),
-        evidence: "Wrong evidence source.",
-      };
-      await writeFile(runPath, JSON.stringify(invalid), "utf8");
+    const rejected = await validateReleaseRun(invalid);
+    expect(rejected.status).toBe(1);
+    expect(rejected.stderr).toContain("adapter evidence");
+  });
 
-      const rejected = spawnSync(process.execPath, [validatorPath, runPath], { encoding: "utf8" });
-      expect(rejected.status).toBe(1);
-      expect(rejected.stderr).toContain("adapter evidence");
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
+  it("rejects successful adapter scoring without every target-environment read record", async () => {
+    const data = await loadReleaseSuite();
+    const run = completedReleaseRun(data) as {
+      cases: Array<{
+        caseId: string;
+        adapted: {
+          targetEnvironment: Array<{ repository: string; commit: string; evidence: string }>;
+        };
+      }>;
+    };
+    const success = run.cases.find(
+      (item) => item.caseId === "adapt-codex-skill-representative-success",
+    );
+    if (!success) throw new Error("expected successful adapter observation");
+    success.adapted.targetEnvironment.pop();
+
+    const rejected = await validateReleaseRun(run);
+    expect(rejected.status).toBe(1);
+    expect(rejected.stderr).toContain("targetEnvironment");
   });
 
   it("rejects a paired case that claims PASS when its baseline failed", async () => {
-    const data = await suite();
-    const directory = await mkdtemp(join(tmpdir(), "release-evals-hardening-"));
-    const runPath = join(directory, "run.json");
-    const validatorPath = fileURLToPath(new URL("validate-run.mjs", ROOT));
+    const data = await loadReleaseSuite();
+    const run = completedReleaseRun(data) as {
+      cases: Array<{
+        caseId: string;
+        baseline: null | {
+          pass: boolean;
+          rubric: Array<{ judgment: "pass" | "fail" | "not-observed" }>;
+        };
+        pass: boolean;
+      }>;
+    };
+    const paired = run.cases.find((item) => item.caseId === "representative-to-spec");
+    if (!paired?.baseline) throw new Error("expected paired evaluation case");
+    paired.baseline.rubric[0]!.judgment = "fail";
+    paired.baseline.pass = false;
+    paired.pass = true;
 
-    try {
-      const run = completedRun(data) as {
+    const rejected = await validateReleaseRun(run);
+    expect(rejected.status).toBe(1);
+    expect(rejected.stderr).toContain("baseline condition passes");
+  });
+
+  it("rejects completed release gates containing fail or not-observed required cases", async () => {
+    const data = await loadReleaseSuite();
+
+    for (const judgment of ["fail", "not-observed"] as const) {
+      const run = completedReleaseRun(data) as {
         cases: Array<{
           caseId: string;
-          baseline: null | {
+          adapted: {
             pass: boolean;
             rubric: Array<{ judgment: "pass" | "fail" | "not-observed" }>;
           };
           pass: boolean;
         }>;
       };
-      const paired = run.cases.find((item) => item.caseId === "representative-to-spec");
-      if (!paired?.baseline) throw new Error("expected paired evaluation case");
-      paired.baseline.rubric[0]!.judgment = "fail";
-      paired.baseline.pass = false;
-      paired.pass = true;
-      await writeFile(runPath, JSON.stringify(run), "utf8");
+      const observation = run.cases.find(
+        (item) => item.caseId === "adapt-codex-skill-representative-success",
+      );
+      if (!observation) throw new Error("expected successful adapter observation");
+      observation.adapted.rubric[0]!.judgment = judgment;
+      observation.adapted.pass = false;
+      observation.pass = false;
 
-      const rejected = spawnSync(process.execPath, [validatorPath, runPath], { encoding: "utf8" });
+      const rejected = await validateReleaseRun(run);
       expect(rejected.status).toBe(1);
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
-  });
-
-  it("rejects completed release gates containing fail or not-observed required cases", async () => {
-    const data = await suite();
-    const validatorPath = fileURLToPath(new URL("validate-run.mjs", ROOT));
-
-    for (const judgment of ["fail", "not-observed"] as const) {
-      const directory = await mkdtemp(join(tmpdir(), "release-evals-hardening-"));
-      const runPath = join(directory, "run.json");
-      try {
-        const run = completedRun(data) as {
-          cases: Array<{
-            caseId: string;
-            adapted: {
-              pass: boolean;
-              rubric: Array<{ judgment: "pass" | "fail" | "not-observed" }>;
-            };
-            pass: boolean;
-          }>;
-        };
-        const observation = run.cases.find(
-          (item) => item.caseId === "adapt-codex-skill-representative-success",
-        );
-        if (!observation) throw new Error("expected successful adapter observation");
-        observation.adapted.rubric[0]!.judgment = judgment;
-        observation.adapted.pass = false;
-        observation.pass = false;
-        await writeFile(runPath, JSON.stringify(run), "utf8");
-
-        const rejected = spawnSync(process.execPath, [validatorPath, runPath], { encoding: "utf8" });
-        expect(rejected.status).toBe(1);
-      } finally {
-        await rm(directory, { recursive: true, force: true });
-      }
+      expect(rejected.stderr).toContain("completed release gate cannot pass");
     }
   });
 
