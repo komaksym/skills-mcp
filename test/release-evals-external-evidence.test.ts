@@ -45,4 +45,24 @@ describe("release evaluation external evidence", () => {
     expect(rejected.status).toBe(1);
     expect(rejected.stderr).toContain("externalResults");
   });
+
+  it("rejects duplicate binding that leaves another external criterion unsupported", async () => {
+    const data = await loadReleaseSuite();
+    const run = completedReleaseRun(data) as {
+      cases: Array<{
+        caseId: string;
+        adapted: { externalResults: unknown[] };
+      }>;
+    };
+    const paired = run.cases.find((item) => item.caseId === "representative-to-spec");
+    if (!paired) throw new Error("expected representative paired case");
+    paired.adapted.externalResults = [
+      { criterionId: "ready-for-agent", evidence: "Observed label state." },
+      { criterionId: "ready-for-agent", evidence: "Observed issue state." },
+    ];
+
+    const rejected = await validateReleaseRun(run);
+    expect(rejected.status).toBe(1);
+    expect(rejected.stderr).toContain("externalResults");
+  });
 });
